@@ -1,0 +1,55 @@
+# CLAUDE.md — Linee guida operative per la piattaforma SaaS (Laravel)
+
+## Obiettivo
+Costruire una piattaforma SaaS **multi-tenant** in Laravel 11+ con architettura modulare. Primo modulo: **Dashboard Google Ads** (MCC + sub-account, KPI campagne, filtri periodo, export). La piattaforma ospiterà altri tool in futuro.
+
+## Principi
+- **Plan first, then code**: prima proponi il piano a step, attendi conferma, poi implementa.
+- **TDD**: scrivi test prima del codice; non modificare i test per farli passare.
+- **Incrementalità**: piccoli commit coerenti; al termine di ogni milestone, aggiorna il README.
+- **Sicurezza**: nessun segreto lato client; token cifrati a riposo; .env non nel VCS.
+- **Multi-tenant**: isolamento dati per tenant (es. `stancl/tenancy` o analogo).
+- **Qualità**: PSR-12, PHPStan/Larastan, PHP-CS-Fixer, test `php artisan test`.
+
+## Decisioni progettuali
+- **Backend**: Laravel 11, PHP 8.3, MySQL 8, Redis (cache/queue), coda con Horizon.
+- **Tenancy**: preferenza `stancl/tenancy` (database-per-tenant o tabelle condivise con scoping; confermare).
+- **Modulo Google Ads**: package interno `modules/GoogleAds` con Service, Repository, DTO, Controller REST.
+- **Auth**: Laravel Breeze/Fortify (e successiva SSO se necessaria).
+- **API**: rotte prefissate `/api/v1/*`, risposte JSON, validazione FormRequest, rate limit, policy/ability per tenant.
+
+## Rotte (prima versione)
+- `POST /api/v1/google/config` — salva credenziali e Login Customer ID (MCC).
+- `GET  /api/v1/google/auth/url` — genera URL OAuth.
+- `GET  /api/v1/google/auth/callback` — salva refresh token cifrato.
+- `GET  /api/v1/google/accounts` — albero MCC → sub-account.
+- `GET  /api/v1/google/campaigns` — query con `customerId`, `start`, `end`, `status?`, `channel?`, paging.
+- `GET  /api/v1/google/campaigns/ts` — serie temporali giornaliere.
+- `GET  /api/v1/google/export/csv` — export tabella corrente.
+
+## Dati sensibili
+- `.env` contiene: chiave app, DB, Redis, chiavi OAuth Google, developer token, MCC, chiave cifratura.
+- **Mai** stampare token nei log; cifrare a riposo (es. OpenSSL + key app).
+
+## Comandi utili (dev)
+- Avvio locale: `php artisan serve` + `php artisan migrate --seed`
+- Test: `php artisan test`  
+- Lint/fix: `php-cs-fixer fix`  
+- Analisi statica: `vendor/bin/phpstan analyse`  
+- Queue: `php artisan queue:work` (o Horizon)
+
+## Regole per i commit
+- Conventional Commits (es. `feat:`, `fix:`, `test:`, `chore:`).
+- Unità piccole e verificabili; includi migrazioni/test quando rilevanti.
+
+## Quando chiedere conferma
+- Scelta modalità tenancy (db-per-tenant vs single-db).
+- Campi obbligatori e mascheramento credenziali.
+- Limiti di rate/paging predefiniti; costo in valuta vs micros per API.
+- Politiche di retention log e PII.
+
+## Definition of Done (MVP backend Google Ads)
+- Setup Laravel con tenancy funzionante.
+- Rotte Google Ads operative con test di integrazione (mock SDK).
+- Credenziali salvate cifrate; OAuth completo; chiamate impersonate per sub-account.
+- README aggiornato: installazione, env, comandi, flusso OAuth.
